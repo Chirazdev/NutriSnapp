@@ -13,7 +13,7 @@ app = Flask(__name__)
 weights_path = r'C:\Users\Chiraz\testAPI\best.pt'
 
 # Load the dataset
-nutrition_df=pd.read_csv(r"C:\Users\Chiraz\Downloads\nutrients_csvfile.csv")
+nutrition_df=pd.read_csv(r"C:\Users\Chiraz\Downloads\nutrients.csv")
 
 # Load the YOLOv5 model
 model = torch.hub.load('ultralytics/yolov5', 'custom', path=weights_path, force_reload=True)
@@ -69,16 +69,21 @@ def upload_file():
         
         # Get all detected class labels
         detected_classes = [results.names[int(label)] for label in results.xyxy[0][:, 5].tolist()]
-        nutritional_values = {}
+
+        # Store nutritional values for each detected class
+        all_nutritional_values = []
+        
         # Check if any classes are detected
         if detected_classes:
            # Iterate through detected classes and find the first match in the nutrition DataFrame
            for detected_class in detected_classes:
+               nutritional_values = {}
                filtered_df = nutrition_df[nutrition_df['Food'].str.contains(detected_class, case=False, na=False)]
                if not filtered_df.empty:
-                  nutritional_values = filtered_df.iloc[1].to_dict()  # Use iloc[0] for the first row
-                  print(f"Detected Class: {detected_class}")
-                  break  # Break the loop on the first match
+                  nutritional_values = filtered_df.iloc[0].to_dict()  # Use iloc[0] for the first row
+                  all_nutritional_values.append({
+                      'detected_class': detected_class,
+                      'nutritional_values': nutritional_values,})
                else:
                    print("No nutritional information found for any detected class")
                    nutritional_values = {}
@@ -89,7 +94,7 @@ def upload_file():
             nutritional_values = {}
         
         # Return annotated image, bounding box info, and nutritional values to the page
-        return render_template('index.html', image=img_str, boxes_info=boxes_info, nutrition_info=nutritional_values)
+        return render_template('index.html', image=img_str, boxes_info=boxes_info, all_nutritional_values=all_nutritional_values)
 
     return redirect(request.url)
 

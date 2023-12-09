@@ -25,9 +25,29 @@
             <p><strong>Class:</strong> {{ box.label }}</p>
             <p><strong>Confidence:</strong> {{ box.confidence }}</p>
             <p><strong>Coordinates:</strong> {{ box.coordinates }}</p>
+            
+            {% for entry in all_nutritional_values %}
+                {% if entry.detected_class == box.label %}
+                    <h4>Nutritional Information:</h4>
+                    <p><strong>Protein:</strong> {{ entry.nutritional_values.Protein }}</p>
+                    <p><strong>Calories:</strong> {{ entry.nutritional_values.Calories }}</p>
+                    <p><strong>Fiber:</strong> {{ entry.nutritional_values.Fiber }}</p>
+                    <p><strong>Fat:</strong> {{ entry.nutritional_values.Fat }}</p>
+                    <p><strong>Carbs:</strong> {{ entry.nutritional_values.Carbs }}</p>
+                {% endif %}
+            {% endfor %}
         </li>
         {% endfor %}
     </ul>
+    {% endif %}
+
+    {% if total_nutritional_values %}
+    <h3>Total Nutritional Values:</h3>
+    <p><strong>Total Protein:</strong> {{ total_nutritional_values['Total Protein'] }}g</p>
+    <p><strong>Total Calories:</strong> {{ total_nutritional_values['Total Calories'] }}kcal</p>
+    <p><strong>Total Fiber:</strong> {{ total_nutritional_values['Total Fiber'] }}g</p>
+    <p><strong>Total Fat:</strong> {{ total_nutritional_values['Total Fat'] }}g</p>
+    <p><strong>Total Carbs:</strong> {{ total_nutritional_values['Total Carbs'] }}g</p>
     {% endif %}
     {% endif %}
 </body>

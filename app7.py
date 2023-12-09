@@ -1,11 +1,13 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for
 import cv2
 import torch
 from werkzeug.middleware.shared_data import SharedDataMiddleware
 import base64
 import pandas as pd 
-
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np 
 
 app = Flask(__name__)
 
@@ -13,7 +15,7 @@ app = Flask(__name__)
 weights_path = r'C:\Users\Chiraz\testAPI\best.pt'
 
 # Load the dataset
-nutrition_df=pd.read_csv(r"C:\Users\Chiraz\Downloads\nutrients_csvfile.csv")
+nutrition_df=pd.read_csv(r"C:\Users\Chiraz\Downloads\nutrients2.csv")
 
 # Load the YOLOv5 model
 model = torch.hub.load('ultralytics/yolov5', 'custom', path=weights_path, force_reload=True)
@@ -69,16 +71,27 @@ def upload_file():
         
         # Get all detected class labels
         detected_classes = [results.names[int(label)] for label in results.xyxy[0][:, 5].tolist()]
-        nutritional_values = {}
+
+        # Store nutritional values for each detected class
+        all_nutritional_values = []
+        
         # Check if any classes are detected
         if detected_classes:
            # Iterate through detected classes and find the first match in the nutrition DataFrame
            for detected_class in detected_classes:
-               filtered_df = nutrition_df[nutrition_df['Food'].str.contains(detected_class, case=False, na=False)]
+               # Utiliser la fonction trouver_repas_proche pour trouver le repas le plus proche
+               repas_proche = trouver_repas_proche(detected_class)
+               print(repas_proche)
+
+               # Filtrer le DataFrame nutrition_df pour obtenir les informations nutritionnelles du repas trouvé
+               filtered_df = nutrition_df[nutrition_df['Food'] == repas_proche]
+
+               nutritional_values = {}
                if not filtered_df.empty:
-                  nutritional_values = filtered_df.iloc[1].to_dict()  # Use iloc[0] for the first row
-                  print(f"Detected Class: {detected_class}")
-                  break  # Break the loop on the first match
+                  nutritional_values = filtered_df.iloc[0].to_dict()  # Use iloc[0] for the first row
+                  all_nutritional_values.append({
+                      'detected_class': detected_class,
+                      'nutritional_values': nutritional_values,})
                else:
                    print("No nutritional information found for any detected class")
                    nutritional_values = {}
@@ -89,9 +102,63 @@ def upload_file():
             nutritional_values = {}
         
         # Return annotated image, bounding box info, and nutritional values to the page
-        return render_template('index.html', image=img_str, boxes_info=boxes_info, nutrition_info=nutritional_values)
+        return render_template('index.html', image=img_str, boxes_info=boxes_info, all_nutritional_values=all_nutritional_values, total_nutritional_values=calculate_total_nutritional_values(all_nutritional_values))
 
     return redirect(request.url)
+
+def trouver_repas_proche(classe, seuil_similarity=0.7):
+    # Utiliser le TfidfVectorizer pour convertir les descriptions de repas en vecteurs TF-IDF
+    vectorizer = TfidfVectorizer()
+    repas_vecteurs = vectorizer.fit_transform(nutrition_df['Food'].values.astype('U'))
+
+    # Convertir la classe en vecteur TF-IDF
+    classe_vecteur = vectorizer.transform([classe])
+
+    # Calculer la similarité cosine entre la classe et chaque repas
+    similarites = cosine_similarity(classe_vecteur, repas_vecteurs).flatten()
+
+    # Trouver l'index du repas le plus proche
+    index_repas_proche = np.argmax(similarites)
+
+    # Récupérer le repas le plus proche et sa similarité
+    repas_proche = nutrition_df.loc[index_repas_proche, 'Food']
+    similarity = similarites[index_repas_proche]
+
+    # Vérifier si la similarité est supérieure au seuil spécifié
+    if similarity >= seuil_similarity:
+        return repas_proche
+    else:
+        return "Aucun repas proche trouvé avec une similarité suffisante"
+
+
+def calculate_total_nutritional_values(all_nutritional_values):
+    # Initialize total nutritional values
+    total_protein = 0
+    total_calories = 0
+    total_fiber = 0
+    total_fat = 0
+    total_carbs = 0
+
+    # Calculate the total nutritional values
+    for item in all_nutritional_values:
+        nutritional_values = item.get('nutritional_values', {})
+        total_protein += nutritional_values.get('Protein', 0)
+        total_calories += nutritional_values.get('Calories', 0)
+        total_fiber += nutritional_values.get('Fiber', 0)
+        total_fat += nutritional_values.get('Fat', 0)
+        total_carbs += nutritional_values.get('Carbs', 0)
+
+    # Return the total nutritional values as a dictionary
+    total_nutritional_values = {
+        'Total Protein': total_protein,
+        'Total Calories': total_calories,
+        'Total Fiber': total_fiber,
+        'Total Fat': total_fat,
+        'Total Carbs': total_carbs,
+    }
+
+    return total_nutritional_values
+
 
 # Fonction pour vérifier si l'extension du fichier est autorisée
 def allowed_file(filename):

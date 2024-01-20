@@ -24,7 +24,7 @@ NutriScan is an innovative application that utilizes object detection to identif
 
 1. Clone the repository: `git clone https://github.com/your-username/nutriscan.git`
 2. Install dependencies: `pip install -r requirements.txt`
-3. Run the application: `python app.py`
+3. Run the application: `python app6.py`
 4. Access the application from your browser at `http://localhost:5000`
 
 
